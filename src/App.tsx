@@ -18,6 +18,17 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  // Load default assets from the public folder on mount
+  useEffect(() => {
+    const defaultBg = new Image();
+    defaultBg.onload = () => setBgImage(defaultBg);
+    defaultBg.src = '/base.png'; // Users can upload base.png to the public/ folder
+
+    const defaultOverlay = new Image();
+    defaultOverlay.onload = () => setOverlayImage(defaultOverlay);
+    defaultOverlay.src = '/overlay.png'; // Users can upload overlay.png to the public/ folder
+  }, []);
+
   // Handle Image Uploads
   const handleBgUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
