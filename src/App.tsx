@@ -23,14 +23,16 @@ export default function App() {
   // Load default base and overlay images on mount
   useEffect(() => {
     const defaultBg = new Image();
+    defaultBg.crossOrigin = "anonymous";
     defaultBg.onload = () => setBgImage(defaultBg);
-    defaultBg.onerror = () => console.warn("Could not find /base.png in the public folder. Please upload it.");
-    defaultBg.src = '/base.png';
+    defaultBg.onerror = () => console.warn("Could not load remote base image.");
+    defaultBg.src = 'https://raw.githubusercontent.com/JohanXf/cate-pfp-/main/public/1786773135146.png';
 
     const defaultOverlay = new Image();
+    defaultOverlay.crossOrigin = "anonymous";
     defaultOverlay.onload = () => setOverlayImage(defaultOverlay);
-    defaultOverlay.onerror = () => console.warn("Could not find /overlay.png in the public folder. Please upload it.");
-    defaultOverlay.src = '/overlay.png';
+    defaultOverlay.onerror = () => console.warn("Could not load remote overlay image.");
+    defaultOverlay.src = 'https://raw.githubusercontent.com/JohanXf/cate-pfp-/main/public/20260815_112943.png';
   }, []);
 
   // Handle Image Uploads
