@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, ChangeEvent, MouseEvent as ReactMouseEvent, TouchEvent as ReactTouchEvent } from 'react';
-import { Upload, Download, ZoomIn, ZoomOut, Move, RefreshCw, Image as ImageIcon, Check } from 'lucide-react';
+import { Upload, Download, ZoomIn, ZoomOut, Move, RefreshCw, Image as ImageIcon, Check, X } from 'lucide-react';
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -7,15 +7,15 @@ export default function App() {
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [overlayImage, setOverlayImage] = useState<HTMLImageElement | null>(null);
-  const [overlayBlend, setOverlayBlend] = useState(true);
-  
+    
   const [bgScale, setBgScale] = useState(1);
+  const [overlayScale, setOverlayScale] = useState(1);
   const [scale, setScale] = useState(1);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
   const [rotation, setRotation] = useState(0);
-  const [transparentBg, setTransparentBg] = useState(false);
-  const [maskRadius, setMaskRadius] = useState(415); // Default to roughly the inner size of the provided gold coin
+    const [maskRadius, setMaskRadius] = useState(415);
+  const [showGuide, setShowGuide] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -98,10 +98,8 @@ export default function App() {
     const innerRadius = maskRadius;
 
     // 1. Draw Background Color
-    if (!transparentBg) {
-      ctx.fillStyle = '#FAF9F6';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+    ctx.fillStyle = '#FAF9F6';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     // 2. Draw Uploaded Base Coin
     if (bgImage) {
@@ -155,21 +153,17 @@ export default function App() {
     // 4. Draw Uploaded Overlay
     if (overlayImage) {
       ctx.save();
-      if (overlayBlend) {
-        ctx.globalCompositeOperation = 'screen';
-      }
-      
-      // Match the overlay exactly to the inner mask radius size
-      const dw = maskRadius * 2;
-      const dh = maskRadius * 2;
-      const dx = cx - maskRadius;
-      const dy = cy - maskRadius;
+      // Match the overlay to the canvas size, then scale by overlayScale
+      const dw = canvas.width * overlayScale;
+      const dh = canvas.width * overlayScale;
+      const dx = cx - (dw / 2);
+      const dy = cy - (dh / 2);
       
       ctx.drawImage(overlayImage, dx, dy, dw, dh);
       ctx.restore();
     }
 
-  }, [bgImage, image, overlayImage, scale, bgScale, offsetX, offsetY, rotation, transparentBg, overlayBlend, maskRadius]);
+  }, [bgImage, image, overlayImage, scale, bgScale, overlayScale, offsetX, offsetY, rotation, maskRadius]);
 
   // Canvas Dragging Logic
   const getCanvasCoords = (e: ReactMouseEvent | ReactTouchEvent | MouseEvent | TouchEvent) => {
@@ -248,7 +242,7 @@ export default function App() {
           <span className="text-xs font-mono opacity-50 tracking-widest hidden sm:inline">PFP_GEN_v1.0</span>
         </div>
         <div className="flex gap-8 items-center text-xs font-bold uppercase tracking-widest">
-           <button className="bg-[#1A1A1A] text-[#FACC15] px-6 py-3 rounded-full hover:bg-[#FACC15] hover:text-[#1A1A1A] transition-colors border-2 border-[#1A1A1A]">Join the Pride</button>
+           <button onClick={() => setShowGuide(true)} className="bg-[#1A1A1A] text-[#FACC15] px-6 py-3 rounded-full hover:bg-[#FACC15] hover:text-[#1A1A1A] transition-colors border-2 border-[#1A1A1A]">Guide</button>
         </div>
       </header>
 
@@ -286,26 +280,45 @@ export default function App() {
                     <input type="file" accept="image/png, image/jpeg, image/webp" className="hidden" onChange={handleOverlayUpload} />
                  </label>
                  
-                 {overlayImage && (
-                   <label className="flex items-center gap-2 cursor-pointer group px-1">
-                      <div className={`w-4 h-4 border-2 border-[#1A1A1A] flex items-center justify-center transition-colors ${overlayBlend ? 'bg-[#FACC15]' : 'bg-white'}`}>
-                        {overlayBlend && <Check size={12} strokeWidth={4} className="text-[#1A1A1A]" />}
-                      </div>
-                      <input 
-                        type="checkbox" 
-                        className="hidden" 
-                        checked={overlayBlend} 
-                        onChange={(e) => setOverlayBlend(e.target.checked)} 
-                      />
-                      <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Remove Black BG (Screen)</span>
-                   </label>
-                 )}
+                 
                </div>
              </div>
            </div>
+        </aside>
+
+        {/* Center Canvas Section */}
+        <section className="flex-1 flex flex-col items-center justify-center bg-[#E5E4E0] relative p-8 lg:p-12 min-h-[500px] overflow-hidden">
+          <div className="absolute top-8 left-8 text-6xl md:text-[100px] lg:text-[120px] font-serif font-black text-black/5 leading-none select-none pointer-events-none">GENERATE</div>
+          
+          <div className="relative w-full max-w-[480px] aspect-square bg-white shadow-[20px_20px_0px_#1A1A1A] border-2 border-[#1A1A1A] p-2 md:p-4 flex items-center justify-center">
+            <div className="relative w-full h-full bg-slate-100 flex items-center justify-center border-2 border-[#1A1A1A] overflow-hidden">
+              <canvas 
+                ref={canvasRef}
+                width={1000}
+                height={1000}
+                className={`w-full h-full object-contain touch-none ${image ? 'cursor-move' : 'cursor-default'}`}
+                onMouseDown={handlePointerDown}
+                onMouseMove={handlePointerMove}
+                onTouchStart={handlePointerDown}
+                onTouchMove={handlePointerMove}
+              />
+              {!image && !bgImage && !overlayImage && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-[#1A1A1A] p-6 text-center bg-white/80 backdrop-blur-sm">
+                  <ImageIcon size={48} strokeWidth={1.5} className="mb-4 opacity-50" />
+                  <p className="font-black uppercase tracking-widest text-xs">No Layers Uploaded</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A] mt-10 lg:mt-12 flex items-center gap-2 opacity-50">
+            <Move size={14} /> Drag image directly to position
+          </p>
+        
            
-           <div className={`space-y-6 transition-opacity duration-300 ${(image || bgImage || overlayImage) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-              <label className="text-[10px] font-black uppercase tracking-widest block opacity-40">Step 02. Frame Adjustments</label>
+           <div className={`w-full max-w-[800px] mt-8 z-10 transition-opacity duration-300 ${(image || bgImage || overlayImage) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+              <label className="text-[10px] font-black uppercase tracking-widest block opacity-40 mb-4 text-center">Step 02. Frame Adjustments</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
 
               {/* Base Coin Zoom Slider */}
               <div>
@@ -320,6 +333,23 @@ export default function App() {
                   min="0.5" max="2" step="0.01" 
                   value={bgScale} 
                   onChange={(e) => setBgScale(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-[#1A1A1A] appearance-none cursor-pointer"
+                />
+              </div>
+
+              {/* Overlay Zoom Slider */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                    <ZoomIn size={14} /> Overlay 'C' Zoom
+                  </label>
+                  <span className="text-[10px] font-mono bg-[#1A1A1A] text-[#FACC15] px-2 py-0.5 rounded-full">{Math.round(overlayScale * 100)}%</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0.5" max="2" step="0.01" 
+                  value={overlayScale} 
+                  onChange={(e) => setOverlayScale(parseFloat(e.target.value))}
                   className="w-full h-2 bg-[#1A1A1A] appearance-none cursor-pointer"
                 />
               </div>
@@ -339,7 +369,7 @@ export default function App() {
                   step="1" 
                   value={maskRadius} 
                   onChange={(e) => setMaskRadius(parseFloat(e.target.value))} 
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#1A1A1A]"
+                  className="w-full h-2 bg-[#1A1A1A] appearance-none cursor-pointer"
                 />
               </div>
               
@@ -377,52 +407,8 @@ export default function App() {
                 />
               </div>
 
-              {/* Transparent BG Toggle */}
-              <div className="pt-2">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className={`w-5 h-5 border-2 border-[#1A1A1A] flex items-center justify-center transition-colors ${transparentBg ? 'bg-[#FACC15]' : 'bg-white'}`}>
-                    {transparentBg && <Check size={14} strokeWidth={4} className="text-[#1A1A1A]" />}
-                  </div>
-                  <input 
-                    type="checkbox" 
-                    className="hidden" 
-                    checked={transparentBg} 
-                    onChange={(e) => setTransparentBg(e.target.checked)} 
-                  />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Transparent BG</span>
-                </label>
+                          </div>
               </div>
-           </div>
-        </aside>
-
-        {/* Center Canvas Section */}
-        <section className="flex-1 flex flex-col items-center justify-center bg-[#E5E4E0] relative p-8 lg:p-12 min-h-[500px] overflow-hidden">
-          <div className="absolute top-8 left-8 text-6xl md:text-[100px] lg:text-[120px] font-serif font-black text-black/5 leading-none select-none pointer-events-none">GENERATE</div>
-          
-          <div className="relative w-full max-w-[480px] aspect-square bg-white shadow-[20px_20px_0px_#1A1A1A] border-2 border-[#1A1A1A] p-2 md:p-4 flex items-center justify-center">
-            <div className="relative w-full h-full bg-slate-100 flex items-center justify-center border-2 border-[#1A1A1A] overflow-hidden">
-              <canvas 
-                ref={canvasRef}
-                width={1000}
-                height={1000}
-                className={`w-full h-full object-contain touch-none ${image ? 'cursor-move' : 'cursor-default'}`}
-                onMouseDown={handlePointerDown}
-                onMouseMove={handlePointerMove}
-                onTouchStart={handlePointerDown}
-                onTouchMove={handlePointerMove}
-              />
-              {!image && !bgImage && !overlayImage && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-[#1A1A1A] p-6 text-center bg-white/80 backdrop-blur-sm">
-                  <ImageIcon size={48} strokeWidth={1.5} className="mb-4 opacity-50" />
-                  <p className="font-black uppercase tracking-widest text-xs">No Layers Uploaded</p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#1A1A1A] mt-10 lg:mt-12 flex items-center gap-2 opacity-50">
-            <Move size={14} /> Drag image directly to position
-          </p>
         </section>
 
         {/* Right Sidebar: Actions */}
@@ -458,6 +444,80 @@ export default function App() {
             </div>
           </div>
         </aside>
+
+
+      {/* Guide Modal */}
+      {showGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#FAF9F6] border-4 border-[#1A1A1A] w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[12px_12px_0px_#1A1A1A]">
+            <div className="p-6 md:p-10 flex flex-col gap-8">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">How to use Cate PFP Gen</h2>
+                  <p className="text-sm font-bold opacity-60">Follow this guide to create your perfect profile picture.</p>
+                </div>
+                <button onClick={() => setShowGuide(false)} className="text-[#1A1A1A] hover:bg-[#FACC15] p-2 border-2 border-transparent hover:border-[#1A1A1A] transition-colors rounded-full">
+                  <X size={24} strokeWidth={3} />
+                </button>
+              </div>
+
+              <div className="space-y-8 text-[#1A1A1A]">
+                {/* Step 1 */}
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 shrink-0 bg-[#FACC15] border-2 border-[#1A1A1A] flex items-center justify-center font-black text-xl">1</div>
+                  <div>
+                    <h3 className="font-bold text-lg mb-2 uppercase tracking-wide">Remove Your Background</h3>
+                    <p className="text-sm leading-relaxed">
+                      Before uploading your photo here, it's best to remove its background so it blends perfectly with the coin. Go to <a href="https://www.remove.bg" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">remove.bg</a>, upload your photo, and download the transparent version.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 shrink-0 bg-[#FACC15] border-2 border-[#1A1A1A] flex items-center justify-center font-black text-xl">2</div>
+                  <div>
+                    <h3 className="font-bold text-lg mb-2 uppercase tracking-wide">Upload Custom Photo</h3>
+                    <p className="text-sm leading-relaxed">
+                      Click the "Upload Custom Photo" button and select the transparent image you just downloaded.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 shrink-0 bg-[#FACC15] border-2 border-[#1A1A1A] flex items-center justify-center font-black text-xl">3</div>
+                  <div>
+                    <h3 className="font-bold text-lg mb-2 uppercase tracking-wide">Use The Sliders</h3>
+                    <div className="space-y-3 mt-3 text-sm">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 border-b border-black/10 pb-3">
+                        <span className="font-black w-40 shrink-0 bg-black/5 px-2 py-1 uppercase tracking-widest text-[10px]">Base Coin Zoom</span>
+                        <span className="opacity-80">Adjusts the size of the gold coin background image.</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 border-b border-black/10 pb-3">
+                        <span className="font-black w-40 shrink-0 bg-black/5 px-2 py-1 uppercase tracking-widest text-[10px]">Overlay 'C' Zoom</span>
+                        <span className="opacity-80">Adjusts the size of the black 'C' logo overlay completely independently.</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 border-b border-black/10 pb-3">
+                        <span className="font-black w-40 shrink-0 bg-black/5 px-2 py-1 uppercase tracking-widest text-[10px]">Coin Inner Size</span>
+                        <span className="opacity-80">Controls the size of the invisible circular mask that crops your custom photo.</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 border-b border-black/10 pb-3">
+                        <span className="font-black w-40 shrink-0 bg-black/5 px-2 py-1 uppercase tracking-widest text-[10px]">Photo Zoom & Rotate</span>
+                        <span className="opacity-80">Scales and rotates your custom photo. (You can also drag the photo directly on the canvas to move it).</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button onClick={() => setShowGuide(false)} className="mt-4 w-full bg-[#1A1A1A] text-[#FACC15] px-6 py-4 font-black uppercase tracking-widest hover:bg-black transition-colors border-2 border-[#1A1A1A]">
+                Got it, let's create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       </main>
     </div>
