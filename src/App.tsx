@@ -7,26 +7,30 @@ export default function App() {
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [overlayImage, setOverlayImage] = useState<HTMLImageElement | null>(null);
+  const [overlayBlend, setOverlayBlend] = useState(true);
   
+  const [bgScale, setBgScale] = useState(1);
   const [scale, setScale] = useState(1);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
   const [rotation, setRotation] = useState(0);
   const [transparentBg, setTransparentBg] = useState(false);
-  const [overlayBlend, setOverlayBlend] = useState(true);
+  const [maskRadius, setMaskRadius] = useState(415); // Default to roughly the inner size of the provided gold coin
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Load default assets from the public folder on mount
+  // Load default base and overlay images on mount
   useEffect(() => {
     const defaultBg = new Image();
     defaultBg.onload = () => setBgImage(defaultBg);
-    defaultBg.src = '/base.png'; // Users can upload base.png to the public/ folder
+    defaultBg.onerror = () => console.warn("Could not find /base.png in the public folder. Please upload it.");
+    defaultBg.src = '/base.png';
 
     const defaultOverlay = new Image();
     defaultOverlay.onload = () => setOverlayImage(defaultOverlay);
-    defaultOverlay.src = '/overlay.png'; // Users can upload overlay.png to the public/ folder
+    defaultOverlay.onerror = () => console.warn("Could not find /overlay.png in the public folder. Please upload it.");
+    defaultOverlay.src = '/overlay.png';
   }, []);
 
   // Handle Image Uploads
@@ -90,58 +94,31 @@ export default function App() {
 
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
-    const outerRadius = 440;
-    const innerRadius = 370;
+    // Mask radius controls both the custom photo clip and the overlay size
+    const innerRadius = maskRadius;
 
-    // 1. Draw Background
+    // 1. Draw Background Color
+    if (!transparentBg) {
+      ctx.fillStyle = '#FAF9F6';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    
+    // 2. Draw Uploaded Base Coin
     if (bgImage) {
-      ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-    } else {
-      // Programmatic fallback background
-      if (!transparentBg) {
-        ctx.fillStyle = '#f5ebd5';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      
-      const gradient = ctx.createLinearGradient(cx - outerRadius, cy - outerRadius, cx + outerRadius, cy + outerRadius);
-      gradient.addColorStop(0, '#e8c547');
-      gradient.addColorStop(0.2, '#fde57e');
-      gradient.addColorStop(0.5, '#d4af37');
-      gradient.addColorStop(0.8, '#aa771c');
-      gradient.addColorStop(1, '#6e4810');
-
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-      ctx.shadowBlur = 20;
-      ctx.shadowOffsetY = 8;
-      ctx.shadowOffsetX = 0;
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
-      ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2, true);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-
-      // Reset shadow for borders
-      ctx.shadowColor = 'transparent';
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = '#b88922';
-      
-      ctx.beginPath();
-      ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
-      ctx.stroke();
+      const bw = canvas.width * bgScale;
+      const bh = canvas.height * bgScale;
+      const bx = (canvas.width - bw) / 2;
+      const by = (canvas.height - bh) / 2;
+      ctx.drawImage(bgImage, bx, by, bw, bh);
     }
 
-    // 2. Draw user custom photo inside the coin mask
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
-    ctx.clip();
-
+    // 3. Draw user custom photo inside the coin mask
     if (image) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+      ctx.clip();
+
       const imgAspectRatio = image.width / image.height;
       let drawWidth = canvas.width;
       let drawHeight = canvas.height;
@@ -161,54 +138,38 @@ export default function App() {
       ctx.translate(x, y);
       ctx.rotate(rotation * Math.PI / 180);
       ctx.drawImage(image, -w / 2, -h / 2, w, h);
-    } else if (!bgImage) {
-      ctx.fillStyle = '#eaddc4';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    } else {
+      // Only draw placeholder if there's no base image either, to avoid ugly grey circle over custom coins
+      if (!bgImage) {
+         ctx.save();
+         ctx.beginPath();
+         ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+         ctx.clip();
+         ctx.fillStyle = '#eaddc4';
+         ctx.fillRect(0, 0, canvas.width, canvas.height);
+         ctx.restore();
+      }
     }
-    ctx.restore();
 
-    // 3. Draw Overlay
+    // 4. Draw Uploaded Overlay
     if (overlayImage) {
       ctx.save();
       if (overlayBlend) {
         ctx.globalCompositeOperation = 'screen';
       }
-      ctx.drawImage(overlayImage, 0, 0, canvas.width, canvas.height);
+      
+      // Match the overlay exactly to the inner mask radius size
+      const dw = maskRadius * 2;
+      const dh = maskRadius * 2;
+      const dx = cx - maskRadius;
+      const dy = cy - maskRadius;
+      
+      ctx.drawImage(overlayImage, dx, dy, dw, dh);
       ctx.restore();
-    } else {
-      // Programmatic fallback 'C'
-      const cOuter = 340;
-      const cInner = 200;
-      const startAngle = Math.PI * 0.22;
-      const endAngle = Math.PI * 1.78;
-
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-      ctx.shadowBlur = 15;
-      ctx.shadowOffsetY = 6;
-      
-      ctx.beginPath();
-      ctx.arc(cx, cy, cOuter, startAngle, endAngle, false);
-      ctx.arc(cx, cy, cInner, endAngle, startAngle, true);
-      ctx.closePath();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fill();
-
-      // Inner shadow / gloss on C
-      ctx.shadowColor = 'transparent';
-      const glossGrad = ctx.createLinearGradient(cx, cy - cOuter, cx, cy + cOuter);
-      glossGrad.addColorStop(0, 'rgba(255,255,255,0.8)');
-      glossGrad.addColorStop(0.4, 'rgba(255,255,255,0.1)');
-      glossGrad.addColorStop(1, 'rgba(255,255,255,0)');
-      
-      ctx.beginPath();
-      ctx.arc(cx, cy, cOuter, startAngle, endAngle, false);
-      ctx.arc(cx, cy, cInner, endAngle, startAngle, true);
-      ctx.closePath();
-      ctx.fillStyle = glossGrad;
-      ctx.fill();
     }
 
-  }, [bgImage, image, overlayImage, scale, offsetX, offsetY, rotation, transparentBg]);
+  }, [bgImage, image, overlayImage, scale, bgScale, offsetX, offsetY, rotation, transparentBg, overlayBlend, maskRadius]);
 
   // Canvas Dragging Logic
   const getCanvasCoords = (e: ReactMouseEvent | ReactTouchEvent | MouseEvent | TouchEvent) => {
@@ -336,15 +297,51 @@ export default function App() {
                         checked={overlayBlend} 
                         onChange={(e) => setOverlayBlend(e.target.checked)} 
                       />
-                      <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Remove Black BG</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Remove Black BG (Screen)</span>
                    </label>
                  )}
                </div>
              </div>
            </div>
            
-           <div className={`space-y-6 transition-opacity duration-300 ${image ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+           <div className={`space-y-6 transition-opacity duration-300 ${(image || bgImage || overlayImage) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
               <label className="text-[10px] font-black uppercase tracking-widest block opacity-40">Step 02. Frame Adjustments</label>
+
+              {/* Base Coin Zoom Slider */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                    <ZoomIn size={14} /> Base Coin Zoom
+                  </label>
+                  <span className="text-[10px] font-mono bg-[#1A1A1A] text-[#FACC15] px-2 py-0.5 rounded-full">{Math.round(bgScale * 100)}%</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0.5" max="2" step="0.01" 
+                  value={bgScale} 
+                  onChange={(e) => setBgScale(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-[#1A1A1A] appearance-none cursor-pointer"
+                />
+              </div>
+
+              {/* Mask/Overlay Size Slider */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                    <ZoomIn size={14} /> Coin Inner Size
+                  </label>
+                  <span className="text-[10px] font-mono bg-[#1A1A1A] text-[#FACC15] px-2 py-0.5 rounded-full">{Math.round((maskRadius / 540) * 100)}%</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="200" 
+                  max="540" 
+                  step="1" 
+                  value={maskRadius} 
+                  onChange={(e) => setMaskRadius(parseFloat(e.target.value))} 
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#1A1A1A]"
+                />
+              </div>
               
               {/* Zoom Slider */}
               <div>

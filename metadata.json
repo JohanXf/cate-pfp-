@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Cate PFP Generator",
+  "description": "For the community by the community",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
